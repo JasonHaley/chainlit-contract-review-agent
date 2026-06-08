@@ -1,43 +1,43 @@
-import chainlit as cl
 import os
-from dotenv import load_dotenv
-from typing import List
+import chainlit as cl
 
-from semantic_kernel.agents import ChatCompletionAgent, ChatHistoryAgentThread
-from semantic_kernel.functions import kernel_function
+from typing import Annotated, List
+from dotenv import load_dotenv
+from agent_framework import Agent
+from agent_framework.foundry import FoundryChatClient
+from azure.identity import AzureCliCredential
 
 from processors.document_processor import DocumentProcessor
-from agents.compare_clause_agent import get_compare_clause_agent
-from agents.analyze_clause_agent import get_analyze_clause_agent
-from agents.compare_contract_agent import get_compare_contract_agent
 from agents.assistant_agent import get_assistant_agent
 
-load_dotenv()
+load_dotenv(override=True)
 
 processor = DocumentProcessor()
 
 
-class CreateFileDownloadPlugin:
-    """A plugin to create a file download link."""
+def create_client() -> FoundryChatClient:
+    """Create the shared Foundry chat client used by every agent."""
+    return FoundryChatClient(
+        project_endpoint=os.environ["FOUNDRY_PROJECT_ENDPOINT"],
+        model=os.environ["FOUNDRY_MODEL"],
+        credential=AzureCliCredential(),
+    )
 
-    def __init__(self, message: cl.Message = None):
-        self.message = message
 
-    @kernel_function(name="create_chainlit_file_download", description="Create a Chainlit file download link for the given filename.")
-    async def create_file_download(self, filename: str) -> cl.File:
-        """Create a file download link for the given filename."""
-        
-        elements = [ 
-            cl.File(
-                name=filename,
-                path=filename,
-                display="inline"
-            )
-        ]
-        if self.message:
-             await cl.Message(
-                content="File Link", elements=elements
-            ).send()
+async def create_chainlit_file_download(
+    filename: Annotated[str, "The file name of the generated document to offer for download."],
+) -> str:
+    """Create a Chainlit file download link for the given filename."""
+    elements = [
+        cl.File(
+            name=filename,
+            path=filename,
+            display="inline",
+        )
+    ]
+    await cl.Message(content="File Link", elements=elements).send()
+    return f"A download link for '{filename}' has been shared with the user."
+
 
 @cl.set_starters
 async def set_starters():
@@ -61,56 +61,66 @@ async def set_starters():
         )
     ]
 
+
 @cl.on_chat_start
 async def on_chat_start():
-    """Initialize the chat with an agent."""
-    agent = get_assistant_agent(processor)
-    agent.kernel.add_plugin(CreateFileDownloadPlugin(cl.Message(content="")))
-    
-    cl.SemanticKernelFilter(kernel=agent.kernel)
+    """Initialize the chat with an agent and a conversation session."""
+    client = create_client()
+    agent = get_assistant_agent(
+        processor,
+        client,
+        extra_tools=[create_chainlit_file_download],
+    )
+
+    # Sessions/conversation state are explicit in Agent Framework: create one and
+    # reuse it across turns so the agent retains history.
+    session = agent.create_session()
+
     cl.user_session.set("agent", agent)
+    cl.user_session.set("session", session)
+
 
 @cl.on_message
 async def on_message(message: cl.Message):
     """Handle incoming messages."""
     agent = cl.user_session.get("agent")
-    thread = cl.user_session.get("thread", None)
+    session = cl.user_session.get("session")
 
     # Check if there are files attached to the message
     if message.elements:
         await cl.Message(content="Processing your uploaded files...").send()
         await process_files(message.elements)
 
-    current_filename = cl.user_session.get("filename", "sample-01.pdf") # Hardcoded for debugging
-    
-    if not thread:
-        message = f"Using your plugins to retrieve the template contract and the uploaded contract using the file name: {current_filename}, perform the following: {message.content}"
+    current_filename = cl.user_session.get("filename", "sample-01.pdf")  # Hardcoded for debugging
+
+    # On the first turn, tell the agent which files to retrieve with its tools.
+    if not cl.user_session.get("initialized", False):
+        user_message = f"Using your plugins to retrieve the template contract and the uploaded contract using the file name: {current_filename}, perform the following: {message.content}"
+        cl.user_session.set("initialized", True)
     else:
-        message = message.content
-    
+        user_message = message.content
+
     await stream_agent_response(
-        agent=agent, 
-        thread=thread, 
-        answer=cl.Message(content=""), 
-        message=message
+        agent=agent,
+        session=session,
+        answer=cl.Message(content=""),
+        message=user_message,
     )
 
-async def stream_agent_response(agent: ChatCompletionAgent, thread: ChatHistoryAgentThread, answer: cl.Message, message: str):
+
+async def stream_agent_response(agent: Agent, session, answer: cl.Message, message: str):
     """Stream the agent's response."""
 
-    async for response in agent.invoke_stream(messages=message, thread=thread):
-        content = getattr(getattr(response, "content", None), "content", None)
-        if content:
-            await answer.stream_token(content)
-        thread = getattr(response, "thread", thread)
-    
-    await answer.update()
-    cl.user_session.set("thread", thread)
+    async for update in agent.run(message, session=session, stream=True):
+        if update.text:
+            await answer.stream_token(update.text)
+
     await answer.send()
+
 
 async def process_files(files: List[cl.File]):
     """Process uploaded files."""
-   
+
     if len(files) > 1:
         await cl.Message(content="Only one file is supported at a time. Please upload a single file.").send()
         return
@@ -118,7 +128,7 @@ async def process_files(files: List[cl.File]):
     filename = ""
     for file in files:
         filename = file.name
-        
+
         await cl.Message(content=f"Ingesting file: {filename} ...").send()
 
         with open(file.path, "rb") as f:
@@ -128,6 +138,7 @@ async def process_files(files: List[cl.File]):
         # Send confirmation back to user
         await cl.Message(content=f"Successfully ingested file: {filename}").send()
         cl.user_session.set("filename", filename)
+
 
 if __name__ == "__main__":
     from chainlit.cli import run_chainlit

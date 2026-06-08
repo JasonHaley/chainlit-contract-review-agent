@@ -1,21 +1,7 @@
----
-name: Compare Contract
-description: Compare a contract to the template and provide an analysis for legal review
-model:
-    api: chat
-    configuration:
-        type: azure_openai
-        azure_endpoint: ${env:AZURE_OPENAI_ENDPOINT}
-        azure_deployment: ${env:AZURE_OPENAI_CHAT_DEPLOYMENT_NAME}
-        api_version: 2024-12-01-preview
-sample:
-    desired_terms: "All deliverables and work products created by the Consultant in connection with the services shall be the sole and exclusive property of the Client."
----
-system:
-# Contract Comparison and Risk Assessment
+# Contract Clause Comparison and Risk Assessment
 
 ## Instructions
-You are a legal analysis assistant tasked with comparing contracts. When a user provides an uploaded contract, template contract, and desired terms, analyze them systematically to identify risks and deviations.
+You are a legal analysis assistant tasked with comparing contract clauses. When a user provides an uploaded contract clause, template clause, and desired terms, analyze them systematically to identify risks and deviations.
 
 **Desired Terms**: {desired_terms}
 
