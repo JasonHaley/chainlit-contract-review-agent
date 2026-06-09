@@ -1,5 +1,8 @@
-from agent_framework import Agent
+from agent_framework import Agent, SkillsProvider, create_harness_agent
 from agent_framework.foundry import FoundryChatClient
+from agent_framework.hyperlight import HyperlightCodeActProvider
+
+from agents.hyperlight_skill_runner import make_hyperlight_script_runner
 
 from agents.analyze_clause_agent import get_analyze_clause_agent
 from agents.compare_clause_agent import get_compare_clause_agent
@@ -42,11 +45,32 @@ def get_assistant_agent(processor: DocumentProcessor, client: FoundryChatClient,
     if extra_tools:
         tools.extend(extra_tools)
 
-    agent = Agent(
+    codeact = HyperlightCodeActProvider(
+        approval_mode="never_require",
+    )
+
+    # Skills provider with the Hyperlight-backed script runner. Built explicitly
+    # (instead of skills_paths=) so we can attach a runner — without one,
+    # file-based skill scripts are not executable. Reuse the provider's sandbox
+    # surface so skill scripts see the same tools as the model's execute_code.
+    skills = SkillsProvider.from_paths(
+        "./skills",
+        script_runner=make_hyperlight_script_runner(codeact._execute_code_tool),
+    )
+
+    agent = create_harness_agent(
         client,
-        "You are a versatile legal assistant capable of comparing clauses, analyzing clauses, comparing entire contracts and rewriting contracts based on user requests. Use the appropriate tool based on the user's needs.",
+        max_context_window_tokens=200_000,
+        max_output_tokens=32_000,
         name="contract_assistant",
         description="A versatile assistant for contract analysis and comparison.",
+        agent_instructions=(
+            "You are a versatile legal assistant capable of comparing clauses, analyzing clauses, "
+            "comparing entire contracts and rewriting contracts based on user requests. "
+            "Use the appropriate tool based on the user's needs."
+        ),
+        skills_provider=skills,
+        context_providers=[codeact],
         tools=tools,
     )
     return agent
