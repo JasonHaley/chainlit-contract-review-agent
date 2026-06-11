@@ -2,7 +2,7 @@ from agent_framework import Agent, SkillsProvider, create_harness_agent
 from agent_framework.foundry import FoundryChatClient
 from agent_framework.hyperlight import HyperlightCodeActProvider
 
-from agents.hyperlight_skill_runner import make_hyperlight_script_runner
+from services.script_runner_service import ScriptRunnerService
 
 from agents.analyze_clause_agent import get_analyze_clause_agent
 from agents.compare_clause_agent import get_compare_clause_agent
@@ -55,8 +55,43 @@ def get_assistant_agent(processor: DocumentProcessor, client: FoundryChatClient,
     # surface so skill scripts see the same tools as the model's execute_code.
     skills = SkillsProvider.from_paths(
         "./skills",
-        script_runner=make_hyperlight_script_runner(codeact._execute_code_tool),
+        script_runner=ScriptRunnerService().as_script_runner(),
     )
+
+    agent_instructions = """
+    ## Legal Assistant Instructions
+
+    You are a versatile legal assistant capable of comparing clauses, analyzing clauses, 
+    comparing entire contracts and rewriting contracts based on user requests. 
+    Use the appropriate tool based on the user's needs.
+
+    ### Code Execution
+
+    When a problem requires computation, validation, or testing:
+    - Write Python code and use `execute_code` to run it in the sandbox.
+    - Always verify results by running the code rather than reasoning about what would happen.
+    - If code fails, read the error message carefully, fix the issue, and retry.
+
+    ### Skills
+
+    You have access to discoverable skills. When a task matches a skill's description:
+    - Follow the skill's instructions carefully.
+    - Use the skill's reference materials for context.
+    - Combine the skill's workflow with code execution when appropriate.
+
+    ### Planning and Research
+
+    For complex tasks:
+    - Break the problem into steps using your todo list.
+    - Research background information using web search when needed.
+    - Save important findings to file memory for later reference.
+    
+    ### Presenting Results
+
+    - Show your work: include the code you ran and its output.
+    - Explain what each part of your solution does.
+    - If applicable, save final results to file memory.
+    """
 
     agent = create_harness_agent(
         client,

@@ -14,7 +14,6 @@ load_dotenv(override=True)
 
 processor = DocumentProcessor()
 
-
 def create_client() -> FoundryChatClient:
     """Create the shared Foundry chat client used by every agent."""
     return FoundryChatClient(
@@ -90,9 +89,10 @@ async def on_message(message: cl.Message):
     if message.elements:
         await cl.Message(content="Processing your uploaded files...").send()
         await process_files(message.elements)
-
+        
     current_filename = cl.user_session.get("filename", "sample-01.pdf")  # Hardcoded for debugging
-
+    print(f"Using {current_filename} as the current filename for agent tools.")
+    
     # On the first turn, tell the agent which files to retrieve with its tools.
     if not cl.user_session.get("initialized", False):
         user_message = f"Using your plugins to retrieve the template contract and the uploaded contract using the file name: {current_filename}, perform the following: {message.content}"
