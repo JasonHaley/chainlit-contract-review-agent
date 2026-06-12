@@ -5,7 +5,7 @@ from typing import Annotated, List
 from dotenv import load_dotenv
 from agent_framework import Agent
 from agent_framework.foundry import FoundryChatClient
-from azure.identity import AzureCliCredential
+from azure.identity import DefaultAzureCredential
 
 from processors.document_processor import DocumentProcessor
 from agents.assistant_agent import get_assistant_agent
@@ -19,7 +19,7 @@ def create_client() -> FoundryChatClient:
     return FoundryChatClient(
         project_endpoint=os.environ["FOUNDRY_PROJECT_ENDPOINT"],
         model=os.environ["FOUNDRY_MODEL"],
-        credential=AzureCliCredential(),
+        credential=DefaultAzureCredential(),
     )
 
 
