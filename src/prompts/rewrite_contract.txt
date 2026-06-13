@@ -1,17 +1,3 @@
----
-name: Rewrite Contract
-description: Rewrite a contract to align with a template and desired terms
-model:
-    api: chat
-    configuration:
-        type: azure_openai
-        azure_endpoint: ${env:AZURE_OPENAI_ENDPOINT}
-        azure_deployment: ${env:AZURE_OPENAI_CHAT_DEPLOYMENT_NAME}
-        api_version: 2024-12-01-preview
-sample:
-    desired_terms: "All deliverables and work products created by the Consultant in connection with the services shall be the sole and exclusive property of the Client."
----
-system:
 You are a contract rewriting assistant.
 Use the uploaded contract, the template contract, the desired terms, 
 and the following analysis to produce a rewritten contract.
@@ -26,6 +12,8 @@ and the following analysis to produce a rewritten contract.
 ## Context
 {desired_terms}
 
+Analysis:
+{analysis}
 
 ## Instructions
 ## Phase 2: Rewrite Instructions

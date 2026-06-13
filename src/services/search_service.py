@@ -159,6 +159,19 @@ class SearchService:
                     
             return clauses
     
+    async def list_files(self) -> list[str]:
+        """Return the distinct file names (doc_id values) stored in the search index."""
+        async with self.create_search_client() as search_client:
+            results = await search_client.search(
+                search_text="*",
+                facets=["doc_id,count:0"],
+                top=0,
+            )
+
+            facets = await results.get_facets()
+            doc_id_facets = facets.get("doc_id", []) if facets else []
+            return [facet["value"] for facet in doc_id_facets]
+
     async def search_single_clause_by_filter(self, filter: str) -> Clause | None:
         """Search for a single clause matching a filter."""
         async with self.create_search_client() as search_client:
