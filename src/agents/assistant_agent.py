@@ -45,6 +45,7 @@ def get_assistant_agent(processor: DocumentProcessor, client: FoundryChatClient,
     if extra_tools:
         tools.extend(extra_tools)
 
+    # Add file tools for interacting with the search index where contracts are stored.
     file_tools = SearchPlugin(processor.search_service)
     list_files = tool(description="List the file names of all contracts stored in the search index.")(file_tools.list_files_in_search_index)
     get_file = tool(description="Get the complete uploaded contract file by filename.")(file_tools.get_file_from_search_index)
@@ -96,14 +97,13 @@ def get_assistant_agent(processor: DocumentProcessor, client: FoundryChatClient,
         max_output_tokens=32_000,
         name="contract_assistant",
         description="A versatile assistant for contract analysis and comparison.",
-        agent_instructions=(
-            "You are a versatile legal assistant capable of comparing clauses, analyzing clauses, "
-            "comparing entire contracts and rewriting contracts based on user requests. "
-            "Use the appropriate tool based on the user's needs. "
-            "You also have access to code execution and a library of skills to assist you in your tasks. "
-        ),
+        agent_instructions=agent_instructions,
         skills_provider=skills,
         tools=tools,
-
+        disable_todo=True,  # Enable the todo list for better planning and reasoning.
+        disable_mode=True,  # Enable agent modes to allow for more flexible behavior.
+        disable_memory=False,  # Enable memory to allow the agent to remember important information across interactions.
+        disable_web_search=False,  # Enable web search for research capabilities when needed.
+        disable_compaction=False,  # Enable context compaction to fit more information in the context window.
     )
     return agent

@@ -57,7 +57,11 @@ async def set_starters():
         cl.Starter(
             label="Rewrite Contract",
             message="Analyze the uploaded contract with the template contract and rewrite a new version of the contract that combines the best clauses from both contracts into a new contract."
-        )
+        ),
+        cl.Starter(
+            label="Compare Contracts Given File Names",
+            message="Lookup the sample-01.pdf and template-01.pdf in the search index and show the git-style unified diff."
+        ),
     ]
 
 
