@@ -1,6 +1,5 @@
-from agent_framework import Agent, SkillsProvider, create_harness_agent
+from agent_framework import Agent, SkillsProvider, create_harness_agent, tool
 from agent_framework.foundry import FoundryChatClient
-from agent_framework.hyperlight import HyperlightCodeActProvider
 
 from services.script_runner_service import ScriptRunnerService
 
@@ -10,6 +9,7 @@ from agents.compare_contract_agent import get_compare_contract_agent
 from agents.rewrite_contract_agent import get_rewrite_analysis_agent, get_rewrite_contract_agent
 
 from processors.document_processor import DocumentProcessor
+from agents.plugins.search_plugin import SearchPlugin
 
 def get_assistant_agent(processor: DocumentProcessor, client: FoundryChatClient, extra_tools=None) -> Agent:
 
@@ -45,14 +45,11 @@ def get_assistant_agent(processor: DocumentProcessor, client: FoundryChatClient,
     if extra_tools:
         tools.extend(extra_tools)
 
-    codeact = HyperlightCodeActProvider(
-        approval_mode="never_require",
-    )
-
-    # Skills provider with the Hyperlight-backed script runner. Built explicitly
-    # (instead of skills_paths=) so we can attach a runner — without one,
-    # file-based skill scripts are not executable. Reuse the provider's sandbox
-    # surface so skill scripts see the same tools as the model's execute_code.
+    file_tools = SearchPlugin(processor.search_service)
+    list_files = tool(description="List the file names of all contracts stored in the search index.")(file_tools.list_files_in_search_index)
+    get_file = tool(description="Get the complete uploaded contract file by filename.")(file_tools.get_file_from_search_index)
+    tools.extend([list_files, get_file])
+    
     skills = SkillsProvider.from_paths(
         "./skills",
         script_runner=ScriptRunnerService().as_script_runner(),
@@ -102,10 +99,11 @@ def get_assistant_agent(processor: DocumentProcessor, client: FoundryChatClient,
         agent_instructions=(
             "You are a versatile legal assistant capable of comparing clauses, analyzing clauses, "
             "comparing entire contracts and rewriting contracts based on user requests. "
-            "Use the appropriate tool based on the user's needs."
+            "Use the appropriate tool based on the user's needs. "
+            "You also have access to code execution and a library of skills to assist you in your tasks. "
         ),
         skills_provider=skills,
-        context_providers=[codeact],
         tools=tools,
+
     )
     return agent

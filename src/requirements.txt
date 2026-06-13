@@ -1,7 +1,7 @@
 agent-framework-azure-ai
 agent-framework-foundry
 agent-framework-core
-agent-framework-hyperlight --pre
+#agent-framework-hyperlight --pre
 agent-framework-azure-ai-search --pre
 agent-framework-orchestrations
 agent-framework-declarative

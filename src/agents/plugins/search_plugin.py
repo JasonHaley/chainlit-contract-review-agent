@@ -1,5 +1,7 @@
 from typing import Annotated
 
+from agent_framework import tool
+
 
 class SearchPlugin:
     """A plugin for searching contract clauses.
@@ -15,6 +17,8 @@ class SearchPlugin:
     def get_tools(self):
         """Return the bound methods to register as agent tools."""
         return [
+            self.list_files_in_search_index,
+            self.get_file_from_search_index,
             self.search_for_clause_in_uploaded_contract,
             self.search_for_clause_in_template_contract,
             self.get_all_clauses_in_uploaded_contract,
@@ -66,3 +70,25 @@ class SearchPlugin:
         if not clauses or len(clauses) == 0:
             return "No clauses found in the template."
         return "\n\n".join([f"{clause.clause_type}: {clause.text_full}" for clause in clauses])
+
+    async def list_files_in_search_index(self) -> str:
+        """List the file names of all contracts stored in the search index."""
+        print("Listing files in search index")
+
+        filenames = await self.search_service.list_files()
+        if not filenames:
+            return "No files found in the search index."
+        return "\n".join(filenames)
+
+    async def get_file_from_search_index(
+        self,
+        filename: Annotated[str, "The file name in the search index."],
+    ) -> str:
+        """Get the complete uploaded contract file by filename."""
+        print(f"Getting file: {filename} in search index")
+
+        clauses = await self.search_service.search_clauses_by_filter(filter=f"doc_id eq '{filename}'")
+        if not clauses or len(clauses) == 0:
+            return "No file found."
+        return "\n\n".join([f"{clause.clause_type}: {clause.text_full}" for clause in clauses])
+
